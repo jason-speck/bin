@@ -1,0 +1,17 @@
+#!/bin/sh
+# showfds - show file descriptors of a process, by PID, by reading from /proc
+
+if [ -z "$1" ]; then
+ echo "Usage: `basename $0` <pid> " 1>&2; exit 1 
+fi
+
+d=/proc/$1/fd
+
+if [ ! -r "$d" ]; then
+    echo "`basename $0`: can't access $d" 1>&2
+    exit 1
+fi
+
+ls -l $d | perl -lne 'print "fd $1" if /(\d+\s+\-\>.*)$/'
+
+

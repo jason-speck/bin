@@ -1,0 +1,56 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Getopt::Long qw(:config no_ignore_case bundling);
+use Sys::Hostname;
+use File::Basename;
+
+my $options_ok = GetOptions ( 
+	     #meta-options
+             'help|h'           => sub { print_help_and_exit() },
+             'usage|u'          => sub { print_usage_and_exit() },
+	   );
+
+print_usage_and_die() if !$options_ok;
+my $epoch_date=shift @ARGV || print_usage_and_die("missing epoch!");
+my $date=localtime($epoch_date);
+print "$date\n";
+
+sub print_help {
+  my ( $message ) = @_;
+
+  if ( defined ( $message ) && ! $message =~ m/^$/ ) {
+    print $message . "\n";
+    print "\n";
+  }
+  print "Usage:  " . basename($0)  .  "<epoch date>\n";
+  print <<EOM
+Options:
+  --usage                    show usage information
+  --help                     show this message
+EOM
+;
+}
+
+
+sub print_help_and_exit {
+  print_help(@_);
+  exit 0;
+}
+  
+sub print_usage_and_exit {
+  print_usage(@_);
+  exit 0;
+}
+
+sub print_usage_and_die {
+  print_usage(@_);
+  exit 1;
+}
+
+sub print_usage {
+  print_help(@_);
+}
+
+
+

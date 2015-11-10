@@ -1,0 +1,98 @@
+#!/usr/bin/python
+import optparse
+import time
+import imaplib
+import datetime
+import getpass
+
+
+def main():
+  p = optparse.OptionParser(description="Purge an IMAP mailbox")
+  p.add_option('-t','--trace',dest="trace",default=False,action="store_true" ,help="Print IMAP trace for debugging")
+  #p.add_option('-m','--mailbox',metavar="mailbox to clean",default=OPTIONAL_DEFAULT_VAL,help="what this option does")
+  p.add_option('-m','--mailbox',metavar="MAILBOX",help="mailbox to clean")
+  p.add_option('-a','--age',metavar="DAYS",type=int,default=365,help="clean mail older than this many days")
+  p.add_option('-b','--batch',metavar="BATCHSIZE",type=int,default=1,help="number of emails to delete at once")
+  p.add_option('-s','--sleep',metavar="SECONDS",type=int,default=30,help="number of seconds to sleep between deletes")
+  p.add_option('-u','--user',metavar="USER",help="imap user")
+  p.add_option('-i','--imap-server',dest="server",metavar="SERVER",help="imap server")
+
+  (options, arguments) = p.parse_args()
+  if not options.user:
+      p.error("missing user")
+
+  if not options.server:
+      p.error("missing server")
+
+  trace=options.trace
+  mailbox=options.mailbox
+  age=options.age
+  batchsize=options.batch
+  sleepsecs=options.sleep
+  imap_user=options.user
+  imap_server=options.server
+
+
+  # Making sure all mandatory options appeared.
+  mandatories = ['mailbox']
+  for m in mandatories:
+    if not options.__dict__[m]:
+      print "mandatory option " + m + " is missing\n"
+      p.print_help()
+      exit(1)
+
+  #the main action
+  if trace:
+    imaplib.Debug=4
+
+  imap_pass=getpass.getpass("password for imap user " + imap_user + ": ")
+  mail = imaplib.IMAP4_SSL(imap_server)
+  try:
+    result,data=mail.login(imap_user,imap_pass)
+  except mail.error, e:
+    print "IMAP error: {0}".format(e)
+    exit(2)
+
+  date = (datetime.date.today() - datetime.timedelta(age)).strftime("%d-%b-%Y")
+
+  #print mail.list() 
+  # Out: list of "folders" aka labels in gmail.
+  result,data =mail.select(mailbox) # connect to inbox.
+  if result != "OK":
+    print "IMAP error: " + data[0]
+    exit(2)
+
+  result, data = mail.uid( "search", None, '(SENTBEFORE {date})'.format(date=date))
+  if result != "OK":
+    print "IMAP error: " + data[0]
+    exit(2)
+
+
+  messages=data[0].split(' ')
+  delete_mails(mail, messages, batchsize, sleepsecs)
+
+  print mail.expunge()
+
+
+def delete_mails(mail, messages, batchsize, sleepsecs):
+  print "I will try to delete these mails: "
+  print messages
+  thisbatch=0
+  for uid in messages:
+    thisbatch += 1
+    print "Deleting message UID " + uid
+    result,data=mail.uid( "store",uid, '+FLAGS', '(\Deleted)')
+    if result != "OK":
+      print "IMAP error: " + data[0]
+      exit(2)
+    if thisbatch >= batchsize:
+      print "hit batch size of {0}".format(batchsize)
+      print "sleeping {0} seconds".format(sleepsecs)
+      time.sleep(sleepsecs)
+      thisbatch=0
+
+if __name__ == '__main__':
+  try:
+    main()
+  except KeyboardInterrupt:
+    exit(9)
